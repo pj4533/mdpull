@@ -54,7 +54,7 @@ struct MetadataPull: ParsableCommand {
             for metadata in tokenMetadata {
                 var traitValues: [String] = []
                 for traitName in traitsSet {
-                    var traitValue = "nil"
+                    var traitValue = "''"
                     if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? String {
                         traitValue = self.useDuneFormat ? "'\(thisValue)'::text" : "\(thisValue)"
                     } else if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? Int {
@@ -70,7 +70,7 @@ struct MetadataPull: ParsableCommand {
                 index += 1
             }
             if self.useDuneFormat {
-                output.append("CREATE OR REPLACE VIEW dune_user_generated.my_metadata_test (token_id, \(columnNamesForTraits.joined(separator: ", ")) AS VALUES\n")
+                output.append("CREATE OR REPLACE VIEW dune_user_generated.my_metadata_test (token_id, \(columnNamesForTraits.joined(separator: ", "))) AS VALUES\n")
                 output.append(lineStrings.joined(separator: ",\n"))
             } else {
                 output.append(lineStrings.joined(separator: ",\n"))
