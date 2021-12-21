@@ -56,21 +56,17 @@ struct MetadataPull: ParsableCommand {
                 for traitName in traitsSet {
                     var traitValue = "''"
                     if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? String {
-                        traitValue = self.useDuneFormat ? "'\(thisValue)'::text" : "\(thisValue)"
+                        traitValue = self.useDuneFormat ? "'\(thisValue)'" : "\(thisValue)"
                     } else if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? Int {
-                        traitValue = self.useDuneFormat ? "\(thisValue)::numeric" : "\(thisValue)"
+                        traitValue = "\(thisValue)"
                     }
                     traitValues.append(traitValue)
                 }
-                if self.useDuneFormat {
-                    lineStrings.append("(\(index)::numeric, \(traitValues.joined(separator: ", ")))")
-                } else {
-                    lineStrings.append("\(index), \(traitValues.joined(separator: ", "))")
-                }
+                lineStrings.append("(\(index), \(traitValues.joined(separator: ", ")))")
                 index += 1
             }
             if self.useDuneFormat {
-                output.append("CREATE OR REPLACE VIEW dune_user_generated.my_metadata_test (token_id, \(columnNamesForTraits.joined(separator: ", "))) AS VALUES\n")
+                output.append("INSERT INTO VIEW cryptocoven.cryptocoven_traits (token_id, \(columnNamesForTraits.joined(separator: ", ")))\nVALUES\n")
                 output.append(lineStrings.joined(separator: ",\n"))
             } else {
                 output.append(lineStrings.joined(separator: ",\n"))
