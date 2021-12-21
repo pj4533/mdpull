@@ -7,16 +7,28 @@ struct MetadataPull: ParsableCommand {
         abstract: "Command line app to pull Opensea style NFT metadata"
     )
 
+    @Argument(help: "IPFS Arg Id")
+    var argId: String
+
+	@Option(name: .shortAndLong, help: "Number of tokens")
+    private var numTokens: Int = 10
+
+    @Option(name: .shortAndLong, help: "Output filename")
+    private var outputFilename: String?
+
+    @Flag(name: .shortAndLong, help: "Use Dune table format")
+    var useDuneFormat = false
+
 	func run() {
         let group = DispatchGroup()
         
         var tokenMetadata: [Metadata] = []
         let datasource = MetadataDataSource()
         let semaphore = DispatchSemaphore(value: 1)
-        for i in 1...9999 {
+        for i in 1...self.numTokens {
             print("Fetching Token #\(i)")
             group.enter()
-            datasource.getMetadata(withArgId: "QmSZaGTScaLwdg1j3L6FiuUxbBa3bMwbNJeme3phij9cbT", withId: i) { metadata in
+            datasource.getMetadata(withArgId: self.argId, withId: i) { metadata in
                 tokenMetadata.append(metadata)
                 semaphore.signal()
                 group.leave()
@@ -40,29 +52,41 @@ struct MetadataPull: ParsableCommand {
             var index = 1
             var lineStrings: [String] = []
             for metadata in tokenMetadata {
-                print("\(index)...\n")
                 var traitValues: [String] = []
                 for traitName in traitsSet {
                     var traitValue = "nil"
                     if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? String {
-                        traitValue = "'\(thisValue)'::text"
+                        traitValue = self.useDuneFormat ? "'\(thisValue)'::text" : "\(thisValue)"
                     } else if let thisValue = metadata.attributes?.filter({$0.traitType == traitName}).first?.value?.value as? Int {
-                        traitValue = "\(thisValue)::numeric"
+                        traitValue = self.useDuneFormat ? "\(thisValue)::numeric" : "\(thisValue)"
                     }
                     traitValues.append(traitValue)
                 }
-                lineStrings.append("(\(index)::numeric, \(traitValues.joined(separator: ", ")))")
+                if self.useDuneFormat {
+                    lineStrings.append("(\(index)::numeric, \(traitValues.joined(separator: ", ")))")
+                } else {
+                    lineStrings.append("\(index), \(traitValues.joined(separator: ", "))")
+                }
                 index += 1
             }
-            output.append("CREATE OR REPLACE VIEW dune_user_generated.my_metadata_test (token_id, \(columnNamesForTraits.joined(separator: ", ")) AS VALUES")
-            output.append(lineStrings.joined(separator: ",\n"))
-            
-            do {
-                let outputURL = URL(fileURLWithPath: "output.sql")
-                try output.write(to: outputURL, atomically: false, encoding: .utf8)
-            } catch let error {
-                print(error.localizedDescription)
+            if self.useDuneFormat {
+                output.append("CREATE OR REPLACE VIEW dune_user_generated.my_metadata_test (token_id, \(columnNamesForTraits.joined(separator: ", ")) AS VALUES\n")
+                output.append(lineStrings.joined(separator: ",\n"))
+            } else {
+                output.append(lineStrings.joined(separator: ",\n"))
             }
+            
+            if let outputFilename = self.outputFilename {
+                do {
+                    let outputURL = URL(fileURLWithPath: outputFilename)
+                    try output.write(to: outputURL, atomically: false, encoding: .utf8)
+                } catch let error {
+                    print(error.localizedDescription)
+                }
+            } else {
+                print(output)
+            }
+            Foundation.exit(0)
         }
 
         // Run GCD main dispatcher, this function never returns, call exit() elsewhere to quit the program or it will hang
